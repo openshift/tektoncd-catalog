@@ -16,5 +16,4 @@ test-e2e-downstream-stable:
 
 test-e2e-downstream:
 	@env RELEASE_YAML=$(RELEASE_YAML) ./e2e-tests-openshift.sh
-	@env LOCAL_CI_RUN=true TEST_YAML_IGNORES="kaniko s2i buildah jib-maven" ../test/e2e-tests.sh
 .PHONY: test-e2e-downstream
