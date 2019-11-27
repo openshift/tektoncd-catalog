@@ -25,6 +25,47 @@ SERVICE_ACCOUNT=builder
 # Install CI
 [[ -z ${LOCAL_CI_RUN} ]] && install_pipeline_crd
 
+# Pipelines Catalog Repository
+PIPELINES_CATALOG_URL=https://github.com/openshift/pipelines-catalog/
+PIPELINES_CATALOG_REF=origin/master
+PIPELINES_CATALOG_DIRECTORY=./openshift/pipelines-catalog
+PIPELINES_CATALOG_IGNORE="s2i-dotnet-1"
+PIPELINES_CATALOG_PRIVILIGED_TASKS="s2i-*"
+
+# Add PIPELINES_CATALOG in here so we can do the CI all together.
+# We checkout the repo in ${PIPELINES_CATALOG_DIRECTORY}, merge them in the main
+# repos and launch the tests.
+function pipelines_catalog() {
+    set -x
+    local oldRepoRootDir
+    local ptest parent
+
+    [[ -d ${PIPELINES_CATALOG_DIRECTORY} ]] || \
+        git clone --depth=1 ${PIPELINES_CATALOG_URL} ${PIPELINES_CATALOG_DIRECTORY}
+
+    pushd ${PIPELINES_CATALOG_DIRECTORY} >/dev/null && \
+        git reset --hard ${PIPELINES_CATALOG_REF} &&
+        popd >/dev/null
+
+    # NOTE(chmouel): The functions doesnt support argument so we can't just leave the test in
+    # ${PIPELINES_CATALOG_DIRECTORY} we need to have it in the top dir, TODO: fix the functions
+    for ptest in ${PIPELINES_CATALOG_DIRECTORY}/*/tests;do
+        parent=$(dirname ${ptest})
+        base=$(basename ${parent})
+        in_array ${base} ${PIPELINES_CATALOG_IGNORE} && { echo "Skipping: ${btest}"; continue ;}
+        [[ -d ./${base} ]] || cp -a ${parent} ./${base}
+
+        echo ${ptest}
+        echo "${PIPELINES_CATALOG_DIRECTORY}/${PIPELINES_CATALOG_PRIVILIGED_TASKS}"
+
+        # TODO(chmouel): Add S2I Images as PRIVILEGED_TESTS, that's not very
+        # flexible and we may want to find some better way.
+        [[ ${ptest} == ${PIPELINES_CATALOG_DIRECTORY}/${PIPELINES_CATALOG_PRIVILIGED_TASKS} ]] && \
+            PRIVILEGED_TESTS="${PRIVILEGED_TESTS} ${base}"
+    done
+    set +x
+}
+
 # in_array function: https://www.php.net/manual/en/function.in-array.php :-D
 function in_array() {
     param=$1;shift
@@ -34,12 +75,17 @@ function in_array() {
     return 1
 }
 
+# Checkout Pipelines Catalog and test
+pipelines_catalog
+
 # Test if yamls can install
 test_yaml_can_install
 
 # Run the privileged tests
 for runtest in ${PRIVILEGED_TESTS};do
+    echo "-----------------------"
     echo "Running privileged test: ${runtest}"
+    echo "-----------------------"
     # Add here the pre-apply-taskrun-hook function so we can do our magic to add the serviceAccount on the TaskRuns,
     function pre-apply-taskrun-hook() {
         cp ${TMPF} ${TMPF2}
@@ -61,6 +107,8 @@ for runtest in */tests;do
     unset -f pre-apply-taskrun-hook || true
     unset -f pre-apply-task-hook || true
 
+    echo "---------------------------"
     echo "Running non privileged test: ${btest}"
+    echo "---------------------------"
     test_task_creation ${runtest}
 done
