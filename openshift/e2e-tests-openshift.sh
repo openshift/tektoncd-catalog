@@ -32,6 +32,11 @@ PIPELINES_CATALOG_DIRECTORY=./openshift/pipelines-catalog
 PIPELINES_CATALOG_IGNORE="s2i-dotnet-1"
 PIPELINES_CATALOG_PRIVILIGED_TASKS="s2i-*"
 
+CURRENT_TAG=$(git describe --tags 2>/dev/null || true)
+if [[ -n ${CURRENT_TAG} ]];then
+    PIPELINES_CATALOG_REF=origin/release-$(echo ${CURRENT_TAG}|sed -e 's/.*\(v[0-9]*\.[0-9]*\).*/\1/')
+fi
+
 # Add PIPELINES_CATALOG in here so we can do the CI all together.
 # We checkout the repo in ${PIPELINES_CATALOG_DIRECTORY}, merge them in the main
 # repos and launch the tests.
@@ -41,7 +46,7 @@ function pipelines_catalog() {
     local ptest parent
 
     [[ -d ${PIPELINES_CATALOG_DIRECTORY} ]] || \
-        git clone --depth=1 ${PIPELINES_CATALOG_URL} ${PIPELINES_CATALOG_DIRECTORY}
+        git clone ${PIPELINES_CATALOG_URL} ${PIPELINES_CATALOG_DIRECTORY}
 
     pushd ${PIPELINES_CATALOG_DIRECTORY} >/dev/null && \
         git reset --hard ${PIPELINES_CATALOG_REF} &&
