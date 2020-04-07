@@ -31,9 +31,7 @@ Example kubectl command
 kubectl apply -f webhook-secret.yaml
 ```
 
-## Inputs
-
-### Parameters
+## Parameters
 
 * **webhook-secret**: The name of the secret that has the webhook URL.  The key for the URL is url
 
@@ -44,17 +42,16 @@ kubectl apply -f webhook-secret.yaml
 This TaskRun runs the Task to post a message to the channel that the webhook URL is associated with.
 
 ```
-apiVersion: tekton.dev/v1alpha1
+apiVersion: tekton.dev/v1beta1
 kind: TaskRun
 metadata:
   name: run-send-to-webhook-slack
 spec:
-  inputs:
-    params:
-      - name: webhook-secret
-        value: webhook-secret
-      - name: message
-        value: "Hello from Tekton!"
+  params:
+  - name: webhook-secret
+    value: webhook-secret
+  - name: message
+    value: "Hello from Tekton!"
   taskRef:
     name: send-to-webhook-slack
 
@@ -104,21 +101,18 @@ kubectl apply -f token-secret.yaml
 This TaskRun runs the Task to post a message to the channel.
 
 ```
-apiVersion: tekton.dev/v1alpha1
+apiVersion: tekton.dev/v1beta1
 kind: TaskRun
 metadata:
   name: run-send-to-channel-slack
 spec:
-  inputs:
-    params:
-      - name: token-secret
-        value: token-secret
-      - name: channel
-        value: {CHANNEL ID}
-      - name: message
-        value: "Hello from Tekton!"
+  params:
+  - name: token-secret
+    value: token-secret
+  - name: channel
+    value: {CHANNEL ID}
+  - name: message
+    value: "Hello from Tekton!"
   taskRef:
     name: send-to-channel-slack
-
 ```
-

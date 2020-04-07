@@ -20,9 +20,7 @@ kubectl apply -f https://raw.githubusercontent.com/tektoncd/catalog/master/build
 
 > **NOTE:** This task is currently only compatible with Tekton **v0.6.0** and above, and CNB Platform API 0.2 (lifecycle v0.6.0 and above). For previous Platform API versions, [see below](#previous-platform-api-versions).
 
-## Inputs
-
-### Parameters
+## Parameters
 
 * **`BUILDER_IMAGE`**: The image on which builds will run (must include v3 lifecycle and compatible buildpacks; _required_)
 
@@ -38,24 +36,24 @@ kubectl apply -f https://raw.githubusercontent.com/tektoncd/catalog/master/build
 
 * **`SOURCE_SUBPATH`**: A subpath within the `source` input where the source to build is located (_default:_ `""`)
 
-### Resources
+## Resources
 
-* **`source`**: A `git`-type `PipelineResource` specifying the location of the
-  source to build. See `SOURCE_SUBPATH` above if source is located within a subpath of this input.
-
-## Outputs
-
-### Resources
+### Outputs
 
 * **`image`**: An `image`-type `PipelineResource` specifying the image that should
   be built.
 
+## Workspaces
+
+The `source` workspace holds the source that will be used by buildpack
+to build and publish the container image.
+
 ## Usage
 
-This `TaskRun` will use the `buildpacks-v3` task to fetch source code from a Git repo, build the source code, then publish a container image.
+This `TaskRun` will use the `buildpacks-v3` task to build the source code, then publish a container image.
 
 ```
-apiVersion: tekton.dev/v1alpha1
+apiVersion: tekton.dev/v1beta1
 kind: TaskRun
 metadata:
   name: example-run
@@ -68,30 +66,27 @@ spec:
 #    - name: my-cache
 #      persistentVolumeClaim:
 #        claimName: task-pv-claim
-  inputs:
-    resources:
-    - name: source
-      resourceSpec:
-        type: git
-        params:
-        - name: url
-          value: <your git repo, e.g. "https://github.com/buildpacks/samples">
-    params:
-    - name: SOURCE_SUBPATH
-      value: <optional subpath within your source repo, e.g. "apps/java-maven">
-    - name: BUILDER_IMAGE
-      value: <your builder image tag, see below for suggestions, e.g. "builder-repo/builder-image:builder-tag">
+  params:
+  - name: SOURCE_SUBPATH
+    value: <optional subpath within your source repo, e.g. "apps/java-maven">
+  - name: BUILDER_IMAGE
+    value: <your builder image tag, see below for suggestions, e.g. "builder-repo/builder-image:builder-tag">
 # Uncomment the lines below to use an existing cache
-#    - name: CACHE
-#      value: my-cache
-  outputs:
-    resources:
+#  - name: CACHE
+#    value: my-cache
+  resources:
+    outputs:
     - name: image
       resourceSpec:
         type: image
         params:
         - name: url
-          value: <your output image tag, e.g. "gcr.io/app-repo/app-image:app-tag">
+          value: <your output image tag,
+          e.g. "gcr.io/app-repo/app-image:app-tag">
+  workspaces:
+  - name: source
+    persistentVolumeClaim:
+      claimName: my-source
 ```
 
 ### Example builders

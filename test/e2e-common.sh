@@ -72,10 +72,18 @@ function show_failure() {
     local testname=$1 tns=$2
 
     echo "FAILED: ${testname} task has failed to comeback properly" ;
-    echo "--- TR Dump"
-    kubectl get -n ${tns} tr -o yaml
+    echo "--- Task Dump"
+    kubectl get -n ${tns} task -o yaml
+    echo "--- Pipeline Dump"
+    kubectl get -n ${tns} pipeline -o yaml
+    echo "--- PipelineRun Dump"
+    kubectl get -n ${tns} pipelinerun -o yaml
+    echo "--- TaskRun Dump"
+    kubectl get -n ${tns} taskrun -o yaml
     echo "--- Container Logs"
-    kubectl get pod -o name -n ${tns}|xargs kubectl logs --all-containers -n ${tns}
+    for pod in $(kubectl get pod -o name -n ${tns}); do
+        kubectl logs --all-containers -n ${tns} ${pod}
+    done
     exit 1
 
 }
@@ -113,12 +121,14 @@ function test_task_creation() {
         while true;do
             [[ ${cnt} == ${maxloop} ]] && show_failure ${testname} ${tns}
 
-            status=$(kubectl get -n ${tns} tr --output=jsonpath='{.items[*].status.conditions[*].status}')
-            reason=$(kubectl get -n ${tns} tr --output=jsonpath='{.items[*].status.conditions[*].reason}')
-            [[ ${status} == *ERROR || ${reason} == *Failed || ${reason} == CouldntGetTask ]] && show_failure ${testname} ${tns}
+            status=$(kubectl get -n ${tns} pipelinerun --output=jsonpath='{.items[*].status.conditions[*].status}')
+            reason=$(kubectl get -n ${tns} pipelinerun --output=jsonpath='{.items[*].status.conditions[*].reason}')
+            [[ ${status} == *ERROR || ${reason} == *Failed || ${reason} == CouldntGetTask || ${reason} == CouldntGetPipeline ]] && show_failure ${testname} ${tns}
             [[ ${status} == True ]] && {
-                echo -n "SUCCESS: ${testname} taskrun has successfully executed: " ;
-                kubectl get pod -o name -n ${tns}|xargs kubectl logs --all-containers -n ${tns}|tail -1
+                echo -n "SUCCESS: ${testname} pipelinerun has successfully executed: " ;
+                for pod in $(kubectl get pod -o name -n ${tns}); do
+                    kubectl logs --all-containers -n ${tns} ${pod}
+                done
                 break
             }
             sleep 10

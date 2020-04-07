@@ -13,10 +13,9 @@ to assemble a container image, then pushes that image to a container registry.
 kubectl apply -f https://raw.githubusercontent.com/tektoncd/catalog/master/buildah/buildah.yaml
 ```
 
-## Inputs
+## Parameters
 
-### Parameters
-
+* **IMAGE**: The name (reference) of the image to build.
 * **BUILDER_IMAGE:**: The name of the image containing the Buildah tool. See
   note below.  (_default:_ quay.io/buildah/stable:v1.11.0)
 * **DOCKERFILE**: The path to the `Dockerfile` to execute (_default:_
@@ -25,20 +24,11 @@ kubectl apply -f https://raw.githubusercontent.com/tektoncd/catalog/master/build
   `.`)
 * **TLSVERIFY**: Verify the TLS on the registry endpoint (for push/pull to a
   non-TLS registry) (_default:_ `true`)
-* **FORMAT**: The format of the built container, oci or docker (_default:_
- `oci`)
 
-### Resources
+## Workspaces
 
 * **source**: A `git`-type `PipelineResource` specifying the location of the
   source to build.
-
-## Outputs
-
-### Resources
-
-* **image**: An `image`-type `PipelineResource` specify the image that should
-  be built.
 
 ## Usage
 
@@ -46,29 +36,20 @@ This TaskRun runs the Task to fetch a Git repo, and build and push a container
 image using Buildah.
 
 ```
-apiVersion: tekton.dev/v1alpha1
+apiVersion: tekton.dev/v1beta1
 kind: TaskRun
 metadata:
   name: buildah-build-my-repo
 spec:
   taskRef:
     name: buildah
-  inputs:
-    resources:
-    - name: source
-      resourceSpec:
-        type: git
-        params:
-        - name: url
-          value: https://github.com/my-user/my-repo
-  outputs:
-    resources:
-    - name: image
-      resourceSpec:
-        type: image
-        params:
-        - name: url
-          value: gcr.io/my-repo/my-image
+  params:
+  - name: IMAGE
+    value: gcr.io/my-repo/my-image
+  workspaces:
+  - name: source
+    persistentVolumeClaim:
+      claimName: my-source
 ```
 
 In this example, the Git repo being built is expected to have a `Dockerfile` at

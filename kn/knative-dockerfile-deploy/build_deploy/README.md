@@ -1,25 +1,26 @@
 # Build and Deploy Pipeline
 
 Let's create a container image from a git source having a Dockerfile and deploy it to a Knative Service.
-This Pipeline builds and push the git source using `buildah` and deploys the container as Knative Service using `kn`.
+This Pipeline clones source code using `git-clone` builds and push the git source using `buildah` and deploys the container as Knative Service using `kn`.
 
 ## Pipeline:
 
 The following Pipeline definition refers:
- - `buildah` and `kn` tasks (we've installed these tasks in One time Setup section)
+- `git-clone` to clone the source code
+- `buildah` and `kn` tasks (we've installed these tasks in One time Setup section)
 - Pipeline resources for git and resulting container image repository
 - Save the following YAML in a file e.g.: `build_deploy_pipeline.yaml` and create the Pipeline using
   `kubectl create -f build_deploy_pipeline.yaml`
 
 ```yaml
-apiVersion: tekton.dev/v1alpha1
+apiVersion: tekton.dev/v1beta1
 kind: Pipeline
 metadata:
   name: buildah-build-kn-create
 spec:
-  resources:
+  workspaces:
   - name: source
-    type: git
+  resources:
   - name: image
     type: image
   params:
@@ -28,14 +29,32 @@ spec:
     description: Arguments to pass to kn CLI
     default:
       - "help"
+  - name: GIT_URL
+    type: string
+    description: Git url to clone
   tasks:
+  - name: fetch-repository
+    taskRef:
+      name: git-clone
+    workspaces:
+    - name: output
+      workspace: source
+    params:
+    - name: url
+      value: $(params.GIT_URL)
+    - name: subdirectory
+      value: ""
+    - name: deleteExisting
+      value: "true"
   - name: buildah-build
     taskRef:
       name: buildah
+    runAfter:
+      - fetch-repository
+    workspaces:
+    - name: source
+      workspace: source
     resources:
-      inputs:
-        - name: source
-          resource: source
       outputs:
         - name: image
           resource: image
@@ -78,22 +97,23 @@ Create the resource as `kubectl create -f resources.yaml`.
 apiVersion: tekton.dev/v1alpha1
 kind: PipelineResource
 metadata:
-  name: buildah-build-kn-create-source
-spec:
-  type: git
-  params:
-    - name: url
-      value: "https://github.com/navidshaikh/helloworld-go"
----
-apiVersion: tekton.dev/v1alpha1
-kind: PipelineResource
-metadata:
   name: buildah-build-kn-create-image
 spec:
   type: image
   params:
     - name: url
       value: "quay.io/navidshaikh/helloworld-go"
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: clone-source-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 500Mi
 ```
 
 ## PipelineRun:
@@ -108,7 +128,7 @@ Save the following YAML in a file e.g.: `pipeline_run.yaml` and create PipelineR
 `kubectl create -f pipeline_run.yaml`.
 
 ```yaml
-apiVersion: tekton.dev/v1alpha1
+apiVersion: tekton.dev/v1beta1
 kind: PipelineRun
 metadata:
   generateName: buildah-build-kn-create-
@@ -117,13 +137,16 @@ spec:
   pipelineRef:
     name: buildah-build-kn-create
   resources:
-    - name: source
-      resourceRef:
-        name: buildah-build-kn-create-source
     - name: image
       resourceRef:
         name: buildah-build-kn-create-image
+  workspaces:
+    - name: source
+      persistentvolumeclaim:
+        claimName: clone-source-pvc
   params:
+    - name: GIT_URL
+      value: "https://github.com/navidshaikh/helloworld-go"
     - name: ARGS
       value:
         - "service"
