@@ -31,7 +31,7 @@ spec:
     - $(params.BUILDER_IMAGE)
     - --as-dockerfile
     - /gen-source/Dockerfile.gen
-    image: quay.io/openshift-pipeline/s2i:nightly
+    image: quay.io/openshift-pipeline/s2i:v0.11
     volumeMounts:
     - mountPath: /gen-source
       name: gen-source
