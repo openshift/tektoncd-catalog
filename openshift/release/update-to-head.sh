@@ -9,7 +9,7 @@ BRANCH=${BRANCH:-v1beta1}
 OPENSHIFT_REMOTE=${OPENSHIFT_REMOTE:-openshift}
 
 # Reset release-next to upstream/v1beta1.
-git fetch upstream v1beta1
+git fetch upstream ${BRANCH}
 git checkout upstream/${BRANCH} --no-track -B release-next
 
 # Update openshift's master and take all needed files from there.
