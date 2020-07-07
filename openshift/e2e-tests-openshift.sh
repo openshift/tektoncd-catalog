@@ -78,11 +78,34 @@ function in_array() {
     return 1
 }
 
+# usage:
+#    create a breakpoint by adding
+#    ```
+#    breakPoint <breakPointName>
+#    ```
+#
+#    to resume (run in pod `e2e`, container `test`)
+#    ```
+#    touch <breakPointName>
+#    ```
+function breakPoint() {
+  waitFileName=${1:-waitFile}
+  while [[ ! -f ${waitFileName} ]]; do
+    sleep 10;
+    echo \*\* --------------------------------------- \*\*
+    echo \*\* breakPoint                              \*\*;
+    echo \*\* run \`touch ${waitFileName}\` to resume \*\*
+  done
+}
+
 # Checkout Pipelines Catalog and test
 pipelines_catalog
+breakPoint checkoutPipelinesCatalogDone
 
 # Test if yamls can install
 test_yaml_can_install
+breakPoint test_yaml_can_installDone
+breakPoint startPrivilegedTests
 
 # Run the privileged tests
 for runtest in ${PRIVILEGED_TESTS};do
@@ -100,6 +123,8 @@ for runtest in ${PRIVILEGED_TESTS};do
     test_task_creation ${runtest}/tests
 done
 
+breakPoint privilegedTestsDone
+breakPoint startNonPrivilegedTests
 exit
 # Run the non privileged tests
 for runtest in */tests;do
@@ -116,3 +141,5 @@ for runtest in */tests;do
     echo "---------------------------"
     test_task_creation ${runtest}
 done
+breakPoint nonPrivilegedTestsDone
+breakPoint endE2E
