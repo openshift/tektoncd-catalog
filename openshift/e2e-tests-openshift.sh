@@ -14,7 +14,7 @@ source $(dirname $0)/../test/e2e-common.sh
 cd $(dirname $(readlink -f $0))/..
 
 # Give these tests the priviliged rights
-PRIVILEGED_TESTS="buildah buildpacks-v3 jib-gradle kaniko s2i"
+PRIVILEGED_TESTS="jib-gradle"
 
 # Skip Those
 SKIP_TESTS=""
@@ -83,7 +83,7 @@ function in_array() {
 pipelines_catalog
 
 # Test if yamls can install
-test_yaml_can_install
+#test_yaml_can_install
 
 # Run the privileged tests
 for runtest in ${PRIVILEGED_TESTS};do
