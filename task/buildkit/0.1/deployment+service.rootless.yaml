@@ -1,3 +1,4 @@
+---
 # from https://github.com/moby/buildkit/tree/a038b5d98379646995275830a4f778bc707b2356/examples/kubernetes
 apiVersion: apps/v1
 kind: Deployment

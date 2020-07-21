@@ -1,3 +1,4 @@
+---
 # This Task will do a helm upgrade based on the given helm repo and chart
 apiVersion: tekton.dev/v1beta1
 kind: Task

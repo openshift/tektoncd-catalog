@@ -30,7 +30,6 @@ spec:
         value: https://github.com/kelseyhightower/nocode
       - name: revision
         value: 1.0.0
-
 ---
 apiVersion: tekton.dev/v1alpha1
 kind: TaskRun

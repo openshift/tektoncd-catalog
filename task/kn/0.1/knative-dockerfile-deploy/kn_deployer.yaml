@@ -1,3 +1,4 @@
+---
 # Define a ServiceAccount named kn-deployer-account that has permission to
 # manage Knative services.
 apiVersion: v1
