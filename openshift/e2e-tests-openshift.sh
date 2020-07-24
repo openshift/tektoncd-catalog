@@ -82,23 +82,23 @@ function in_array() {
 pipelines_catalog
 
 # Test if yamls can install
-test_yaml_can_install
+# test_yaml_can_install
 
 # Run the privileged tests
-for runtest in ${PRIVILEGED_TESTS};do
-    echo "-----------------------"
-    echo "Running privileged test: ${runtest}"
-    echo "-----------------------"
+# for runtest in ${PRIVILEGED_TESTS};do
+    # echo "-----------------------"
+    # echo "Running privileged test: ${runtest}"
+    # echo "-----------------------"
     # Add here the pre-apply-taskrun-hook function so we can do our magic to add the serviceAccount on the TaskRuns,
-    function pre-apply-taskrun-hook() {
-        cp ${TMPF} ${TMPF2}
-        python3 openshift/e2e-add-service-account.py ${SERVICE_ACCOUNT} < ${TMPF2} > ${TMPF}
-        oc adm policy add-scc-to-user privileged system:serviceaccount:${tns}:${SERVICE_ACCOUNT} || true
-    }
-    unset -f pre-apply-task-hook || true
+    # function pre-apply-taskrun-hook() {
+      #  cp ${TMPF} ${TMPF2}
+      #  python3 openshift/e2e-add-service-account.py ${SERVICE_ACCOUNT} < ${TMPF2} > ${TMPF}
+      #  oc adm policy add-scc-to-user privileged system:serviceaccount:${tns}:${SERVICE_ACCOUNT} || true
+    # }
+    # unset -f pre-apply-task-hook || true
 
-    test_task_creation task/${runtest}/*/tests
-done
+    # test_task_creation task/${runtest}/*/tests
+# done
 
 # Run the non privileged tests
 for runtest in task/*/*/tests;do
