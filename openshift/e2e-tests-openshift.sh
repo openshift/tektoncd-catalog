@@ -22,8 +22,7 @@ SKIP_TESTS="docker-build"
 # Service Account used for image builder
 SERVICE_ACCOUNT=builder
 
-# Install CI
-[[ -z ${LOCAL_CI_RUN} ]] && install_pipeline_crd
+PIPELINE_MIDSTREAM_REGISTRY=quay.io/openshift-pipeline/tektoncd-pipeline
 
 # Pipelines Catalog Repository
 PIPELINES_CATALOG_URL=${PIPELINES_CATALOG_URL:-https://github.com/openshift/pipelines-catalog/}
@@ -42,7 +41,6 @@ fi
 # We checkout the repo in ${PIPELINES_CATALOG_DIRECTORY}, merge them in the main
 # repos and launch the tests.
 function pipelines_catalog() {
-    set -x
     local ptest parent parentWithVersion
 
     [[ -d ${PIPELINES_CATALOG_DIRECTORY} ]] || \
@@ -65,7 +63,6 @@ function pipelines_catalog() {
         in_array ${base} ${PIPELINES_CATALOG_PRIVILIGED_TASKS} && \
             PRIVILEGED_TESTS="${PRIVILEGED_TESTS} ${base}"
     done
-    set +x
 }
 
 # in_array function: https://www.php.net/manual/en/function.in-array.php :-D
@@ -77,8 +74,20 @@ function in_array() {
     return 1
 }
 
+function fix_gcr_image_to_openshift_pipeline() {
+    # we are rewritting the pipeline_version since we want to make sure to test agains the version we requesting (stable or nightly)
+    sed -i -r "s,(\")?gcr.io/tekton-releases/github.com/tektoncd/pipeline/cmd/([^:]*):([^$]*),\"${PIPELINE_MIDSTREAM_REGISTRY}-\2:${PIPELINE_VERSION}\"," $(find ./task -type f -name '*.yaml')
+}
+
+# Install CI this will use RELEASE_YAML variable as detect from the Makefile (nightly or stable)
+[[ -z ${LOCAL_CI_RUN} ]] && install_pipeline_crd
+
 # Checkout Pipelines Catalog and test
 pipelines_catalog
+
+# Make sure the gcr images from upstream point to the one from openshift
+# pipeline with the version we want
+fix_gcr_image_to_openshift_pipeline
 
 # Test if yamls can install
 test_yaml_can_install
