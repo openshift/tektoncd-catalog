@@ -10,6 +10,26 @@ TMPF=$(mktemp /tmp/.mm.XXXXXX)
 clean() { rm -f ${TMP} ${TMPF2}; }
 trap clean EXIT
 
+# usage:
+#    create a breakpoint by adding
+#    ```
+#    breakPoint <breakPointName>
+#    ```
+#
+#    to resume (run in pod `e2e`, container `test`)
+#    ```
+#    touch <breakPointName>
+#    ```
+function breakPoint() {
+  waitFileName=${1:-waitFile}
+  while [[ ! -f ${waitFileName} ]]; do
+    sleep 10;
+    echo \*\* --------------------------------------- \*\*
+    echo \*\* breakPoint                              \*\*;
+    echo \*\* run \`touch ${waitFileName}\` to resume \*\*
+  done
+}
+
 source $(dirname $0)/../test/e2e-common.sh
 cd $(dirname $(readlink -f $0))/..
 
@@ -76,11 +96,17 @@ function in_array() {
     return 1
 }
 
+breakPoint ready-for-test
+
 # Checkout Pipelines Catalog and test
 pipelines_catalog
 
+breakPoint test-yaml-can-install
+
 # Test if yamls can install
 test_yaml_can_install
+
+breakPoint privilleged-tests
 
 # Run the privileged tests
 for runtest in ${PRIVILEGED_TESTS};do
@@ -98,6 +124,8 @@ for runtest in ${PRIVILEGED_TESTS};do
     test_task_creation task/${runtest}/*/tests
 done
 
+breakPoint non-priv-tests
+
 # Run the non privileged tests
 for runtest in task/*/*/tests;do
     btest=$(basename $(dirname $(dirname $runtest)))
@@ -113,5 +141,7 @@ for runtest in task/*/*/tests;do
     echo "---------------------------"
     test_task_creation ${runtest}
 done
+
+breakPoint finally
 
 exit
