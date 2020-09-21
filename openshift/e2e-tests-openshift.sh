@@ -22,8 +22,28 @@ SKIP_TESTS="docker-build"
 # Service Account used for image builder
 SERVICE_ACCOUNT=builder
 
+function check-service-endpoints() {
+  service=${1}
+  # list tekton-pipelines-webhook service endpoints
+  echo "-----------------------"
+  echo "checking ${service} service endpoints"
+  count=0
+  while [[ -z $(kubectl get endpoints ${service } -o jsonpath='{.subsets}') ]]; do
+    sleep 10
+    if [[ $count -gt 60 ]]; then
+      echo ${service} endpoints unavailable
+      break
+    fi
+    echo wait for ${service} endpoints
+    count=$(( count+1 ))
+  done
+}
+
 # Install CI
 [[ -z ${LOCAL_CI_RUN} ]] && install_pipeline_crd
+
+# list tekton-pipelines-webhook service endpoints
+check-service-endpoints "tekton-pipelines-webhook"
 
 # Pipelines Catalog Repository
 PIPELINES_CATALOG_URL=${PIPELINES_CATALOG_URL:-https://github.com/openshift/pipelines-catalog/}
