@@ -25,6 +25,12 @@ SERVICE_ACCOUNT=builder
 # Install CI
 [[ -z ${LOCAL_CI_RUN} ]] && install_pipeline_crd
 
+# list tekton-pipelines-webhook service endpoints
+echo "-----------------------"
+echo "tekton-pipelines-webhook service endpoints"
+kubectl get endpoints tekton-pipelines-webhook -o jsonpath='{.subsets}'
+echo "-----------------------"
+
 # Pipelines Catalog Repository
 PIPELINES_CATALOG_URL=${PIPELINES_CATALOG_URL:-https://github.com/openshift/pipelines-catalog/}
 PIPELINES_CATALOG_REF=${PIPELINES_CATALOG_REF:-origin/master}
