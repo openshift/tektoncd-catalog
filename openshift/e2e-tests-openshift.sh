@@ -22,6 +22,15 @@ function check-service-endpoints() {
   done
 }
 
+function set-system-critical-priority() {
+    deployment=${1}
+    namespace=${2}
+    echo "-----------------------"
+    echo "updating pod priority to system-cluster-critical"
+    echo "-----------------------"
+    kubectl patch deployment ${deployment} -n ${namespace}  --patch '{"spec": {"template": {"spec": {"priorityClassName":"system-cluster-critical"}}}}'
+}
+
 # Create some temporary file to work with, we will delete them right after exiting
 TMPF2=$(mktemp /tmp/.mm.XXXXXX)
 TMPF=$(mktemp /tmp/.mm.XXXXXX)
@@ -42,6 +51,11 @@ SERVICE_ACCOUNT=builder
 
 # Install CI
 [[ -z ${LOCAL_CI_RUN} ]] && install_pipeline_crd
+
+# Update priority for tekton-pipelines-webhook
+set-system-critical-priority "tekton-pipelines-webhook" "tekton-pipelines"
+# Update priority for tekton-pipelines-controller
+set-system-critical-priority "tekton-pipelines-controller" "tekton-pipelines"
 
 # list tekton-pipelines-webhook service endpoints
 check-service-endpoints "tekton-pipelines-webhook" "tekton-pipelines"
