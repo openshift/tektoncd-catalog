@@ -22,6 +22,26 @@ function check-service-endpoints() {
   done
 }
 
+# usage:
+#    create a breakpoint by adding
+#    ```
+#    breakPoint <breakPointName>
+#    ```
+#
+#    to resume (run in pod `e2e`, container `test`)
+#    ```
+#    touch <breakPointName>
+#    ```
+function breakPoint() {
+  waitFileName=${1:-waitFile}
+  while [[ ! -f ${waitFileName} ]]; do
+    sleep 10;
+    echo \*\* --------------------------------------- \*\*
+    echo \*\* breakPoint                              \*\*;
+    echo \*\* run \`touch ${waitFileName}\` to resume \*\*
+  done
+}
+
 # Create some temporary file to work with, we will delete them right after exiting
 TMPF2=$(mktemp /tmp/.mm.XXXXXX)
 TMPF=$(mktemp /tmp/.mm.XXXXXX)
@@ -40,11 +60,17 @@ SKIP_TESTS="docker-build"
 # Service Account used for image builder
 SERVICE_ACCOUNT=builder
 
+
+breakPoint install-pipeline
 # Install CI
 [[ -z ${LOCAL_CI_RUN} ]] && install_pipeline_crd
 
 # list tekton-pipelines-webhook service endpoints
 check-service-endpoints "tekton-pipelines-webhook" "tekton-pipelines"
+
+breakPoint pipeline-installed-endpoints-up
+
+breakPoint run-debugging-experiments-done
 
 # Pipelines Catalog Repository
 PIPELINES_CATALOG_URL=${PIPELINES_CATALOG_URL:-https://github.com/openshift/pipelines-catalog/}
@@ -135,4 +161,5 @@ for runtest in task/*/*/tests;do
     test_task_creation ${runtest}
 done
 
+breakPoint end-of-e2e
 exit
