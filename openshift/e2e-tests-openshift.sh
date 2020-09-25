@@ -2,7 +2,7 @@
 #
 # This will runs the E2E tests on OpenShift
 #
-set -e
+#set -e
 
 function check-service-endpoints() {
   service=${1}
@@ -101,7 +101,13 @@ function in_array() {
 pipelines_catalog
 
 # Test if yamls can install
-test_yaml_can_install
+#test_yaml_can_install
+
+while test_yaml_can_install; ret=$?; [[ $ret -ne 0 ]]; do
+  echo "-----------------------"
+  echo 'retry test_yaml_can_install'
+  echo "-----------------------"
+done
 
 # Run the privileged tests
 for runtest in ${PRIVILEGED_TESTS};do
