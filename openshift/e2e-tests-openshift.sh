@@ -120,8 +120,12 @@ for runtest in ${PRIVILEGED_TESTS};do
         oc adm policy add-scc-to-user privileged system:serviceaccount:${tns}:${SERVICE_ACCOUNT} || true
     }
     unset -f pre-apply-task-hook || true
-
-    test_task_creation task/${runtest}/*/tests
+    until test_task_creation task/${runtest}/*/tests; do
+      echo "-----------------------"
+      echo "retry test_task_creation-task/${runtest} tests"
+      echo "-----------------------"
+     sleep 5
+    done
 done
 
 # Run the non privileged tests
