@@ -80,8 +80,6 @@ spec:
           mountPath: /layers
         - name: $(params.CACHE)
           mountPath: /cache
-      securityContext:
-        privileged: true
 
     - name: create
       image: $(params.BUILDER_IMAGE)
@@ -107,6 +105,9 @@ spec:
           mountPath: /cache
         - name: $(params.PLATFORM_DIR)
           mountPath: /platform
+      securityContext:
+        runAsUser: 1000
+        runAsGroup: 1000
 
   volumes:
     - name: empty-dir
