@@ -2,6 +2,7 @@
 #
 # This will runs the E2E tests on OpenShift
 #
+MAX_NUMBERS_OF_PARALLEL_TASKS=4 # start from 0 so 4==5 :p
 set -e
 
 function check-service-endpoints() {
@@ -62,7 +63,6 @@ fi
 # We checkout the repo in ${PIPELINES_CATALOG_DIRECTORY}, merge them in the main
 # repos and launch the tests.
 function pipelines_catalog() {
-    set -x
     local ptest parent parentWithVersion
 
     [[ -d ${PIPELINES_CATALOG_DIRECTORY} ]] || \
@@ -85,7 +85,6 @@ function pipelines_catalog() {
         in_array ${base} ${PIPELINES_CATALOG_PRIVILIGED_TASKS} && \
             PRIVILEGED_TESTS="${PRIVILEGED_TESTS} ${base}"
     done
-    set +x
 }
 
 # in_array function: https://www.php.net/manual/en/function.in-array.php :-D
@@ -95,6 +94,87 @@ function in_array() {
         [[ $param == $elem ]] && return 0;
     done
     return 1
+}
+
+function test_privileged {
+    local cnt=0
+    local task_to_tests=""
+
+    # Run the non privileged tests
+    for runtest in $@;do
+        btest=$(basename $(dirname $(dirname $runtest)))
+        in_array ${btest} ${SKIP_TESTS} && { echo "Skipping: ${btest}"; continue ;}
+
+        # Add here the pre-apply-taskrun-hook function so we can do our magic to add the serviceAccount on the TaskRuns,
+        function pre-apply-taskrun-hook() {
+            cp ${TMPF} ${TMPF2}
+            python3 openshift/e2e-add-service-account.py ${SERVICE_ACCOUNT} < ${TMPF2} > ${TMPF}
+            oc adm policy add-scc-to-user privileged system:serviceaccount:${tns}:${SERVICE_ACCOUNT} || true
+        }
+        unset -f pre-apply-task-hook || true
+
+        task_to_tests="${task_to_tests} task/${runtest}/*/tests"
+
+        if [[ ${cnt} == "${MAX_NUMBERS_OF_PARALLEL_TASKS}" ]];then
+            echo "Running privileged test: ${task_to_tests}"
+            echo "----------------------------------------------"
+
+            test_task_creation ${task_to_tests}
+
+            cnt=0
+            task_to_tests=""
+            continue
+        fi
+
+        cnt=$((cnt+1))
+    done
+
+    # Remaining task
+    if [[ -n ${task_to_tests} ]];then
+        echo "Running non privileged test: ${task_to_tests}"
+        echo "----------------------------------------------"
+
+        test_task_creation ${task_to_tests}
+    fi
+}
+
+function test_non_privileged {
+    local cnt=0
+    local task_to_tests=""
+
+    # Run the non privileged tests
+    for runtest in $@;do
+        btest=$(basename $(dirname $(dirname $runtest)))
+        in_array ${btest} ${SKIP_TESTS} && { echo "Skipping: ${btest}"; continue ;}
+        in_array ${btest} ${PRIVILEGED_TESTS} && continue # We did them previously
+
+        # Make sure the functions are not set anymore here or this will get run.
+        unset -f pre-apply-taskrun-hook || true
+        unset -f pre-apply-task-hook || true
+
+        task_to_tests="${task_to_tests} ${runtest}"
+
+        if [[ ${cnt} == "${MAX_NUMBERS_OF_PARALLEL_TASKS}" ]];then
+            echo "Running non privileged test: ${task_to_tests}"
+            echo "----------------------------------------------"
+
+            test_task_creation ${task_to_tests}
+
+            cnt=0
+            task_to_tests=""
+            continue
+        fi
+
+        cnt=$((cnt+1))
+    done
+
+    # Remaining task
+    if [[ -n ${task_to_tests} ]];then
+        echo "Running non privileged test: ${task_to_tests}"
+        echo "----------------------------------------------"
+
+        test_task_creation ${task_to_tests}
+    fi
 }
 
 # Checkout Pipelines Catalog and test
@@ -107,38 +187,5 @@ until test_yaml_can_install; do
   echo "-----------------------"
   sleep 5
 done
-
-# Run the privileged tests
-for runtest in ${PRIVILEGED_TESTS}; do
-    in_array ${runtest} ${SKIP_TESTS} && { echo "Skipping: ${runtest}"; continue ;}
-    echo "-----------------------"
-    echo "Running privileged test: ${runtest}"
-    echo "-----------------------"
-    # Add here the pre-apply-taskrun-hook function so we can do our magic to add the serviceAccount on the TaskRuns,
-    function pre-apply-taskrun-hook() {
-        cp ${TMPF} ${TMPF2}
-        python3 openshift/e2e-add-service-account.py ${SERVICE_ACCOUNT} < ${TMPF2} > ${TMPF}
-        oc adm policy add-scc-to-user privileged system:serviceaccount:${tns}:${SERVICE_ACCOUNT} || true
-    }
-    unset -f pre-apply-task-hook || true
-
-    test_task_creation task/${runtest}/*/tests
-done
-
-# Run the non privileged tests
-for runtest in task/*/*/tests;do
-    btest=$(basename $(dirname $(dirname $runtest)))
-    in_array ${btest} ${SKIP_TESTS} && { echo "Skipping: ${btest}"; continue ;}
-    in_array ${btest} ${PRIVILEGED_TESTS} && continue # We did them previously
-
-    # Make sure the functions are not set anymore here or this will get run.
-    unset -f pre-apply-taskrun-hook || true
-    unset -f pre-apply-task-hook || true
-
-    echo "---------------------------"
-    echo "Running non privileged test: ${btest}"
-    echo "---------------------------"
-    test_task_creation ${runtest}
-done
-
-exit
+test_non_privileged $(\ls -1 -d task/*/*/tests)
+test_privileged ${PRIVILEGED_TESTS}
