@@ -45,7 +45,7 @@ function add_task() {
             exit 1
         fi
 	fi
-    kubectl -n "${tns}" apply -f "${path_version}"/"${task}".yaml
+    kubectl -v=10 -n "${tns}" apply -f "${path_version}"/"${task}".yaml
 }
 
 function install_pipeline_crd() {
@@ -57,12 +57,12 @@ function install_pipeline_crd() {
     latestreleaseyaml="https://storage.googleapis.com/tekton-releases/pipeline/latest/release.yaml"
   fi
   [[ -z ${latestreleaseyaml} ]] && fail_test "Could not get latest released release.yaml"
-  kubectl apply -f ${latestreleaseyaml} ||
+  kubectl -v=10 apply -f ${latestreleaseyaml} ||
     fail_test "Build pipeline installation failed"
 
   # Make sure thateveything is cleaned up in the current namespace.
   for res in pipelineresources tasks pipelines taskruns pipelineruns; do
-    kubectl delete --ignore-not-found=true ${res}.tekton.dev --all
+    kubectl -v=10 delete --ignore-not-found=true ${res}.tekton.dev --all
   done
 
   # Wait for pods to be running in the namespaces we are deploying to
@@ -73,7 +73,7 @@ function test_yaml_can_install() {
     # Validate that all the Task CRDs in this repo are valid by creating them in a NS.
     readonly ns="task-ns"
     all_tasks="$*"
-    kubectl create ns "${ns}" || true
+    kubectl -v=10 create ns "${ns}" || true
     local runtest
     for runtest in ${all_tasks}; do
         # remove task/ from beginning
@@ -88,7 +88,7 @@ function test_yaml_can_install() {
         done
         [[ -n ${skipit} ]] && break
         echo "Checking ${testname}"
-        kubectl -n ${ns} apply -f <(sed "s/namespace:.*/namespace: task-ns/" "${runtest}")
+        kubectl -v=10 -n ${ns} apply -f <(sed "s/namespace:.*/namespace: task-ns/" "${runtest}")
     done
 }
 
@@ -97,16 +97,16 @@ function show_failure() {
 
     echo "FAILED: ${testname} task has failed to comeback properly" ;
     echo "--- Task Dump"
-    kubectl get -n ${tns} task -o yaml
+    kubectl -v=10 get -n ${tns} task -o yaml
     echo "--- Pipeline Dump"
-    kubectl get -n ${tns} pipeline -o yaml
+    kubectl -v=10 get -n ${tns} pipeline -o yaml
     echo "--- PipelineRun Dump"
-    kubectl get -n ${tns} pipelinerun -o yaml
+    kubectl -v=10 get -n ${tns} pipelinerun -o yaml
     echo "--- TaskRun Dump"
-    kubectl get -n ${tns} taskrun -o yaml
+    kubectl -v=10 get -n ${tns} taskrun -o yaml
     echo "--- Container Logs"
-    for pod in $(kubectl get pod -o name -n ${tns}); do
-        kubectl logs --all-containers -n ${tns} ${pod} || true
+    for pod in $(kubectl -v=10 get pod -o name -n ${tns}); do
+        kubectl -v=10 logs --all-containers -n ${tns} ${pod} || true
     done
     exit 1
 
@@ -145,7 +145,7 @@ function test_task_creation() {
 
         [[ -n ${skipit} ]] && continue
 
-        kubectl create namespace ${tns}
+        kubectl -v=10 create namespace ${tns}
 
         # Install the task itself first
         for yaml in ${taskdir}/*.yaml;do
@@ -165,7 +165,7 @@ $(cat ${taskdir}/tests/fixtures/*.yaml|sed 's/^/          /')
 EOF
             }
 
-            kubectl -n ${tns} create -f ${TMPF}
+            kubectl -v=10 -n ${tns} create -f ${TMPF}
         done
 
         # Install resource and run
@@ -173,7 +173,7 @@ EOF
             cp ${yaml} ${TMPF}
             [[ -f ${taskdir}/tests/pre-apply-taskrun-hook.sh ]] && source ${taskdir}/tests/pre-apply-taskrun-hook.sh
             function_exists pre-apply-taskrun-hook && pre-apply-taskrun-hook
-            kubectl -n ${tns} create -f ${TMPF}
+            kubectl -v=10 -n ${tns} create -f ${TMPF}
         done
 
         local cnt=0
@@ -189,15 +189,15 @@ EOF
             # sometimes we don't get all_status and reason in one go so
             # wait until we get the reason and all_status for 5 iterations
             for _ in {1..5}; do
-                all_status=$(kubectl get -n ${tns} pipelinerun --output=jsonpath='{.items[*].status.conditions[*].status}')
-                reason=$(kubectl get -n ${tns} pipelinerun --output=jsonpath='{.items[*].status.conditions[*].reason}')
+                all_status=$(kubectl -v=10 get -n ${tns} pipelinerun --output=jsonpath='{.items[*].status.conditions[*].status}')
+                reason=$(kubectl -v=10 get -n ${tns} pipelinerun --output=jsonpath='{.items[*].status.conditions[*].reason}')
                 [[ ! -z ${all_status} ]] && [[ ! -z ${reason} ]] && break
             done
 
             if [[ -z ${all_status} && -z ${reason} ]];then
                 for _ in {1..5}; do
-                    all_status=$(kubectl get -n ${tns} taskrun --output=jsonpath='{.items[*].status.conditions[*].status}')
-                    reason=$(kubectl get -n ${tns} taskrun --output=jsonpath='{.items[*].status.conditions[*].reason}')
+                    all_status=$(kubectl -v=10 get -n ${tns} taskrun --output=jsonpath='{.items[*].status.conditions[*].status}')
+                    reason=$(kubectl -v=10 get -n ${tns} taskrun --output=jsonpath='{.items[*].status.conditions[*].reason}')
                     [[ ! -z ${all_status} ]] && [[ ! -z ${reason} ]] && break
                 done
             fi
@@ -228,6 +228,6 @@ EOF
 
         # Delete namespace unless we specify the CATALOG_TEST_SKIP_CLEANUP env
         # variable so we can debug in case the user needs it.
-        [[ -z ${CATALOG_TEST_SKIP_CLEANUP} ]] && kubectl delete ns ${tns}
+        [[ -z ${CATALOG_TEST_SKIP_CLEANUP} ]] && kubectl -v=10 delete ns ${tns}
     done
 }
