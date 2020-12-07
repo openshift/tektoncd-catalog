@@ -5,6 +5,8 @@
 MAX_NUMBERS_OF_PARALLEL_TASKS=4 # start from 0 so 4==5 :p
 set -e
 
+KUBECTL="kubectl --cache-dir=/tmp/cache"
+
 function check-service-endpoints() {
   service=${1}
   namespace=${2}
