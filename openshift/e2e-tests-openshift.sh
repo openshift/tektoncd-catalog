@@ -6,17 +6,22 @@ set -e
 
 # Maximin number of parallel tasks run at the same time
 # # start from 0 so 4 => 5
-MAX_NUMBERS_OF_PARALLEL_TASKS=4
+MAX_NUMBERS_OF_PARALLEL_TASKS=1
 
 # This is needed on openshift CI since HOME is read only and if we don't cache,
 # it takes over 15s every kubectl query without caching.
 KUBECTL_CMD="kubectl --cache-dir=/tmp/cache"
 
 # Give these tests the priviliged rights
-PRIVILEGED_TESTS="buildah buildpacks buildpacks-phases jib-gradle kaniko kythe-go s2i"
+PRIVILEGED_TESTS="s2i"
+NON_PRIVILEGED_TESTS="task/black/0.1/tests task/npm/0.1/tests"
+
+# Orka Tasks which can be tested as privileged but existing SA needs to be used
+# to give privileged access
+ORKA_TASKS="orka-init orka-teardown"
 
 # Skip those tests when they really can't work in OpenShift
-SKIP_TESTS="docker-build orka-full"
+SKIP_TESTS="docker-build orka-full orka-deploy"
 
 # Service Account used for image builder
 SERVICE_ACCOUNT=builder
@@ -118,6 +123,7 @@ function test_non_privileged {
         btest=$(basename $(dirname $(dirname $runtest)))
         in_array ${btest} ${SKIP_TESTS} && { echo "Skipping: ${btest}"; continue ;}
         in_array ${btest} ${PRIVILEGED_TESTS} && continue # We did them previously
+        in_array ${btest} ${ORKA_TASKS} && continue # We did them previously
 
         # Make sure the functions are not set anymore here or this will get run.
         unset -f pre-apply-taskrun-hook || true
@@ -150,6 +156,48 @@ function test_non_privileged {
     fi
 }
 
+function test_privileged_orka {
+    local cnt=0
+    local task_to_tests=""
+
+    # Run the privileged tests
+    for runtest in $@;do
+        btest=$(basename $(dirname $(dirname $runtest)))
+        in_array ${btest} ${SKIP_TESTS} && { echo "Skipping: ${btest}"; continue ;}
+
+        # Add here the pre-apply-taskrun-hook function so we can do our magic to add the serviceAccount on the TaskRuns,
+        function pre-apply-taskrun-hook() {
+            oc adm policy add-scc-to-user privileged system:serviceaccount:${tns}:orka-svc || true
+        }
+        unset -f pre-apply-task-hook || true
+
+        task_to_tests="${task_to_tests} task/${runtest}/*/tests"
+
+        if [[ ${cnt} == "${MAX_NUMBERS_OF_PARALLEL_TASKS}" ]];then
+            echo "---"
+            echo "Running orka privileged test: ${task_to_tests}"
+            echo "---"
+
+            test_task_creation ${task_to_tests}
+
+            cnt=0
+            task_to_tests=""
+            continue
+        fi
+
+        cnt=$((cnt+1))
+    done
+
+    # Remaining task
+    if [[ -n ${task_to_tests} ]];then
+        echo "---"
+        echo "Running orka privileged test: ${task_to_tests}"
+        echo "---"
+
+        test_task_creation ${task_to_tests}
+    fi
+}
+
 # Test if yamls can install
 until test_yaml_can_install; do
   echo "-----------------------"
@@ -157,5 +205,6 @@ until test_yaml_can_install; do
   echo "-----------------------"
   sleep 5
 done
-test_non_privileged $(\ls -1 -d task/*/*/tests)
+test_non_privileged ${NON_PRIVILEGED_TESTS}
+test_privileged_orka ${ORKA_TASKS}
 test_privileged ${PRIVILEGED_TESTS}
