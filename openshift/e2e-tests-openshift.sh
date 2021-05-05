@@ -178,5 +178,5 @@ until test_yaml_can_install; do
   echo "-----------------------"
   sleep 5
 done
-test_non_privileged $(\ls -1 -d task/*/*/tests)
-test_privileged ${PRIVILEGED_TESTS}
+test_non_privileged "task/write-file/0.1/tests"
+# test_privileged ${PRIVILEGED_TESTS}
