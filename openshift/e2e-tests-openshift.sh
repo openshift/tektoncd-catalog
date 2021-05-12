@@ -13,7 +13,7 @@ MAX_NUMBERS_OF_PARALLEL_TASKS=4
 KUBECTL_CMD="kubectl --cache-dir=/tmp/cache"
 
 # Give these tests the priviliged rights
-PRIVILEGED_TESTS="buildah buildpacks buildpacks-phases jib-gradle jib-maven kaniko kythe-go orka-init orka-teardown s2i kind"
+PRIVILEGED_TESTS="jib-maven"
 
 # Skip those tests when they really can't work in OpenShift
 SKIP_TESTS="docker-build orka-full orka-deploy"
@@ -96,6 +96,10 @@ function test_privileged {
             if $(in_array ${btest} ${ORKA_TASKS}); then
                 oc adm policy add-scc-to-user privileged system:serviceaccount:${tns}:orka-svc || true
             else
+                [[ "${btest}" == "jib-maven" ]] && {
+                    cp ${TMPF} ${TMPF2}
+                    python3 openshift/e2e-add-privileged-context.py < ${TMPF2} > ${TMPF}
+                }
                 cp ${TMPF} ${TMPF2}
                 python3 openshift/e2e-add-service-account.py ${SERVICE_ACCOUNT} < ${TMPF2} > ${TMPF}
                 oc adm policy add-scc-to-user privileged system:serviceaccount:${tns}:${SERVICE_ACCOUNT} || true
@@ -178,5 +182,5 @@ until test_yaml_can_install; do
   echo "-----------------------"
   sleep 5
 done
-test_non_privileged $(\ls -1 -d task/*/*/tests)
+# test_non_privileged $(\ls -1 -d task/*/*/tests)
 test_privileged ${PRIVILEGED_TESTS}
