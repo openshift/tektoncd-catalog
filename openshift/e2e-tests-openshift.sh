@@ -13,7 +13,9 @@ MAX_NUMBERS_OF_PARALLEL_TASKS=4
 KUBECTL_CMD="kubectl --cache-dir=/tmp/cache"
 
 # Give these tests the priviliged rights
-PRIVILEGED_TESTS="jib-maven"
+PRIVILEGED_TESTS="kind jib-maven"
+
+Pipeline_SA="jib-maven"
 
 # Skip those tests when they really can't work in OpenShift
 SKIP_TESTS="docker-build orka-full orka-deploy"
@@ -95,21 +97,18 @@ function test_privileged {
         # Add here the pre-apply-taskrun-hook function so we can do our magic to add the serviceAccount on the TaskRuns,
         function pre-apply-taskrun-hook() {
             btest=$(basename $(dirname $(dirname $runtest)))
+            echo ${tns}
             if $(in_array ${btest} ${ORKA_TASKS}); then
                 oc adm policy add-scc-to-user privileged system:serviceaccount:${tns}:orka-svc || true
+            elif $(in_array ${btest} ${Pipeline_SA}); then
+                ${KUBECTL_CMD} create sa pipeline --namespace=${tns} || true
+                ${KUBECTL_CMD} create rolebinding jib-maven-binding --clusterrole=pipelines-scc-clusterrole --serviceaccount=${tns}:pipeline --namespace=${tns} || true
+                cp ${TMPF} ${TMPF2}
+                python3 openshift/e2e-add-service-account.py pipeline < ${TMPF2} > ${TMPF}
             else
-                [[ "${btest}" == "jib-maven" ]] && {
-                    ${KUBECTL_CMD} create sa pipeline --namespace=${tns}
-                    ${KUBECTL_CMD} create rolebinding jib-maven-binding --clusterrole=pipelines-scc-clusterrole --serviceaccount:${tns}:pipeline --namespace=${tns}
-                    cp ${TMPF} ${TMPF2}
-                    python3 openshift/e2e-add-service-account.py pipeline < ${TMPF2} > ${TMPF}
-                    # cp ${TMPF} ${TMPF2}
-                    # python3 openshift/e2e-add-privileged-context.py < ${TMPF2} > ${TMPF}
-                } || {
-                    cp ${TMPF} ${TMPF2}
-                    python3 openshift/e2e-add-service-account.py ${SERVICE_ACCOUNT} < ${TMPF2} > ${TMPF}
-                    oc adm policy add-scc-to-user privileged system:serviceaccount:${tns}:${SERVICE_ACCOUNT} || true
-                }
+                cp ${TMPF} ${TMPF2}
+                python3 openshift/e2e-add-service-account.py ${SERVICE_ACCOUNT} < ${TMPF2} > ${TMPF}
+                oc adm policy add-scc-to-user privileged system:serviceaccount:${tns}:${SERVICE_ACCOUNT} || true
             fi
         }
         unset -f pre-apply-task-hook || true
