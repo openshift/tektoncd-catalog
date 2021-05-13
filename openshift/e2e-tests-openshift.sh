@@ -71,6 +71,8 @@ check-for-deployment-availability "tekton-pipelines-webhook" "tekton-pipelines"
 # list tekton-pipelines-webhook service endpoints
 check-service-endpoints "tekton-pipelines-webhook" "tekton-pipelines"
 
+${KUBECTL_CMD} create --filename $(dirname $0)/pipelinescc
+
 CURRENT_TAG=$(git describe --tags 2>/dev/null || true)
 
 # in_array function: https://www.php.net/manual/en/function.in-array.php :-D
@@ -97,12 +99,17 @@ function test_privileged {
                 oc adm policy add-scc-to-user privileged system:serviceaccount:${tns}:orka-svc || true
             else
                 [[ "${btest}" == "jib-maven" ]] && {
+                    ${KUBECTL_CMD} create sa pipeline --namespace=${tns}
+                    ${KUBECTL_CMD} create rolebinding jib-maven-binding --clusterrole=pipelines-scc-clusterrole --serviceaccount:${tns}:pipeline --namespace=${tns}
                     cp ${TMPF} ${TMPF2}
-                    python3 openshift/e2e-add-privileged-context.py < ${TMPF2} > ${TMPF}
+                    python3 openshift/e2e-add-service-account.py pipeline < ${TMPF2} > ${TMPF}
+                    # cp ${TMPF} ${TMPF2}
+                    # python3 openshift/e2e-add-privileged-context.py < ${TMPF2} > ${TMPF}
+                } || {
+                    cp ${TMPF} ${TMPF2}
+                    python3 openshift/e2e-add-service-account.py ${SERVICE_ACCOUNT} < ${TMPF2} > ${TMPF}
+                    oc adm policy add-scc-to-user privileged system:serviceaccount:${tns}:${SERVICE_ACCOUNT} || true
                 }
-                cp ${TMPF} ${TMPF2}
-                python3 openshift/e2e-add-service-account.py ${SERVICE_ACCOUNT} < ${TMPF2} > ${TMPF}
-                oc adm policy add-scc-to-user privileged system:serviceaccount:${tns}:${SERVICE_ACCOUNT} || true
             fi
         }
         unset -f pre-apply-task-hook || true
