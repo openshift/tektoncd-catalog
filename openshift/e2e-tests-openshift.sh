@@ -13,9 +13,7 @@ MAX_NUMBERS_OF_PARALLEL_TASKS=4
 KUBECTL_CMD="kubectl --cache-dir=/tmp/cache"
 
 # Give these tests the priviliged rights
-PRIVILEGED_TESTS="kind jib-maven"
-
-Pipeline_SA="jib-maven"
+PRIVILEGED_TESTS="jib-gradle jib-maven"
 
 # Skip those tests when they really can't work in OpenShift
 SKIP_TESTS="docker-build orka-full orka-deploy"
@@ -73,8 +71,6 @@ check-for-deployment-availability "tekton-pipelines-webhook" "tekton-pipelines"
 # list tekton-pipelines-webhook service endpoints
 check-service-endpoints "tekton-pipelines-webhook" "tekton-pipelines"
 
-${KUBECTL_CMD} create --filename $(dirname $0)/pipelinescc
-
 CURRENT_TAG=$(git describe --tags 2>/dev/null || true)
 
 # in_array function: https://www.php.net/manual/en/function.in-array.php :-D
@@ -90,6 +86,8 @@ function test_privileged {
     local cnt=0
     local task_to_tests=""
 
+    ${KUBECTL_CMD} create --filename $(dirname $0)/pipelinescc
+
     # Run the privileged tests
     for runtest in $@;do
         in_array ${runtest} ${SKIP_TESTS} && { echo "Skipping: ${runtest}"; continue ;}
@@ -100,15 +98,15 @@ function test_privileged {
             echo ${tns}
             if $(in_array ${btest} ${ORKA_TASKS}); then
                 oc adm policy add-scc-to-user privileged system:serviceaccount:${tns}:orka-svc || true
-            elif $(in_array ${btest} ${Pipeline_SA}); then
+            else
                 ${KUBECTL_CMD} create sa pipeline --namespace=${tns} || true
-                ${KUBECTL_CMD} create rolebinding jib-maven-binding --clusterrole=pipelines-scc-clusterrole --serviceaccount=${tns}:pipeline --namespace=${tns} || true
+                ${KUBECTL_CMD} create rolebinding pipeline-binding --clusterrole=pipelines-scc-clusterrole --serviceaccount=${tns}:pipeline --namespace=${tns} || true
                 cp ${TMPF} ${TMPF2}
                 python3 openshift/e2e-add-service-account.py pipeline < ${TMPF2} > ${TMPF}
-            else
-                cp ${TMPF} ${TMPF2}
-                python3 openshift/e2e-add-service-account.py ${SERVICE_ACCOUNT} < ${TMPF2} > ${TMPF}
-                oc adm policy add-scc-to-user privileged system:serviceaccount:${tns}:${SERVICE_ACCOUNT} || true
+
+                # cp ${TMPF} ${TMPF2}
+                # python3 openshift/e2e-add-service-account.py ${SERVICE_ACCOUNT} < ${TMPF2} > ${TMPF}
+                # oc adm policy add-scc-to-user privileged system:serviceaccount:${tns}:${SERVICE_ACCOUNT} || true
             fi
         }
         unset -f pre-apply-task-hook || true
